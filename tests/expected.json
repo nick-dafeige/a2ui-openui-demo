@@ -1,0 +1,17 @@
+{
+  "_note": "Hand-computed from the spec table (not produced by the engine). Rates are fractions; changePp in percentage points.",
+  "range": { "start": "2026-11-02", "end": "2026-11-08" },
+  "previousRange": { "start": "2026-10-26", "end": "2026-11-01" },
+  "totals": { "calls": 720, "answered": 348, "conversions": 83, "unanswered": 372 },
+  "campaigns": {
+    "c1": { "calls": 200, "answered": 130, "answerRate": 0.65, "conversions": 39, "conversionRate": 0.3, "prevAnswerRate": 0.5, "prevCalls": 200, "changePp": 15 },
+    "c2": { "calls": 300, "answered": 120, "answerRate": 0.4, "conversions": 24, "conversionRate": 0.2, "prevAnswerRate": 0.6, "prevCalls": 300, "changePp": -20 },
+    "c3": { "calls": 150, "answered": 75, "answerRate": 0.5, "conversions": 15, "conversionRate": 0.2, "prevAnswerRate": 0.5, "prevCalls": 150, "changePp": 0 },
+    "c4": { "calls": 40, "answered": 20, "answerRate": 0.5, "conversions": 4, "conversionRate": 0.2, "prevAnswerRate": null, "prevCalls": 0, "changePp": null },
+    "c5": { "calls": 0, "answered": 0, "answerRate": null, "conversions": 0, "conversionRate": null, "prevAnswerRate": null, "prevCalls": 0, "changePp": null },
+    "c6": { "calls": 10, "answered": 3, "answerRate": 0.3, "conversions": 1, "conversionRate": 0.3333333333, "prevAnswerRate": 0.8, "prevCalls": 10, "changePp": -50 },
+    "c7": { "calls": 20, "answered": 0, "answerRate": 0, "conversions": 0, "conversionRate": null, "prevAnswerRate": 0.2, "prevCalls": 20, "changePp": -20 }
+  },
+  "changeRankingOrder": ["c6", "c2", "c7", "c3", "c1", "c4", "c5"],
+  "c2Unanswered": { "total": 180, "no_answer": 110, "busy": 45, "failed": 25 }
+}

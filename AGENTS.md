@@ -1,0 +1,39 @@
+# Scene MVP — agent instructions
+
+Harness-engineering approach: build the feature together with the environment that lets an agent run, verify and iterate on it reliably. Demo: AI Call & Campaign Reporting on synthetic data. **v0.3.0 adds a second mode, Retail (conversational after-sales, `src/retail/`, English UI), behind a Reporting / Retail switch (`src/Shell.tsx`). Retail is additive: Reporting code, tests and test ids are unchanged; every retail test id starts with `rt-`.** **Reporting (v0.2.0): reporting lives in the chat message stream; report state is owned by its message (`src/chat/state.ts`). Never reintroduce a global report area or mutate historical reports.** Read `docs/ARCHITECTURE.md` (how Reporting and Retail work), `docs/SEQUENCE-REPORTING.md` and `docs/SEQUENCE-RETAIL.md` (sequence diagrams), `docs/TASKS.md` (current phase + acceptance) and `docs/DECISIONS.md` (metrics, mappings, spike findings) before editing.
+
+## Commands
+- `npm run verify:offline` — typecheck + unit tests + offline browser tests (Playwright, dev server in stub-fail mode). Zero paid calls. Run after every change.
+- `npm run test:e2e:live` — PAID browser checks (6 reserved requests). Run deliberately.
+- `npm run dev` — app on http://localhost:5173 (`SCENE_MODEL_MODE=live` default).
+- `npm run verify:live` — paid DeepSeek checks. Reads `DEEPSEEK_API_KEY` from the environment or from `.env` (or the file named by `SCENE_ENV_FILE`); refuses unless a key is found AND `evidence/MODEL_CALL_BUDGET.json` authorises requests.
+
+## Retail model-written interface (v0.5.0)
+- Retail chat UI is written by the MODEL as OpenUI Lang (`src/retail/openui/`): library (`library.tsx`), bindings (`bundle.ts`), validation (`validate.ts`), events (`events.ts`), orchestration (`compose.ts`), message (`LangMessage.tsx`). Header selector `rt-ui-mode` = OpenUI (default) | Fixed cards (v0.4, kept; also used by Rules-only). Never convert card ids to Lang in the app and never wrap an old card in a component.
+- Facts only through bindings; a component accepts only matching binding kinds; wording figures go through `guardAnswer`. Never accept Lang that `checkLang` rejected, never rely on the renderer to drop bad parts, and never let a program, component or event submit (submission = app Confirm button, `confirmed:true`).
+- A control press is an event: check revision + offered control + legal value, then `eventToIntent` -> `applyIntent` (same path as typed language). Dates are never written by the model (`adopt` from a tool result, DatePicker for the user).
+- At most one repair call per turn (counted). After changing the Lang prompt, library, validator or planning contract run `npx vite-node scripts/verify-retail-ui-live.ts` (CASES=... for a subset; ~2 requests per case, refuses when the ledger is short) and `RUN_DIR=<dir> SCENE_PORT=5184 npx playwright test -c playwright.live.config.ts e2e-live/retail-openui.spec.ts` (~10 requests). Offline: `npm run verify:offline` (mock model, real app). Read `evidence/MODEL_CALL_BUDGET.json` first; only the user changes the cap.
+- New evidence goes in a timestamped dir `evidence/v0.5.0-<date>-<tag>/`; keep failed and earlier runs.
+
+## Retail mode rules (v0.3.0 - v0.4.0)
+- v0.4.0 turn planner (`src/retail/turn.ts`): the model plans the turn (discuss | what_if | change, tools, answer, components) from application FACTS; the application computes every number and owns state. Never let discuss/what_if change state, never add a branch keyed on a user sentence (extend the facts or a tool instead), never render model figures that the guard has not checked, and keep submission a button. After changing the prompt, facts or tools run `node --experimental-strip-types scripts/verify-retail-turns-live.ts` (up to ~25 paid requests; it refuses when the ledger is short) and `npx playwright test -c playwright.live.config.ts e2e-live/retail.spec.ts` (up to 8); the offline suite uses scripted models and proves wiring and guards only. Read the ledger first; the cap is changed only by the user.
+- Interaction model (v0.3.1): the conversation is driven by `nextNeed` in `src/retail/state.ts` and `applyIntent` in `src/retail/flow.ts`. One question per turn, the smallest component that answers it; answered cards collapse (`markAnswered`). Never add a card that collects several fields, and never reply "use the cards": ask a specific question (`clarify`). New wishes (like drop-off) need an intent field, a parser rule, a model-prompt line, a `nextNeed` branch and a dialog test.
+- Natural language (v0.3.2): typed messages go to the model with `contextFor(task)`; rules run only when the user selects "Rules only" or explicitly clicks "Use basic rules" after a failure. NEVER add a silent fallback, and never show "Understood by model" without server proof (`viaLabel`/`checkResponse` in `src/retail/trace.ts`). Every interpret request carries a request id and leaves a trace record without key, prompt or message text. Stub server modes must report `modelCalled: false`.
+- After any change to `intent.ts` prompt/keys, run `node --experimental-strip-types scripts/verify-retail-live.ts` (10 paid requests) and `npx playwright test -c playwright.live.config.ts e2e-live/retail.spec.ts` (5 paid requests); the offline suite proves only the rules path.
+- Eligibility, fees, dates, quotes and case numbers come only from `src/retail/rules.ts` and `src/retail/service.ts`. The model (or the labelled rules fallback `parseIntentLocal`) only extracts an `Intent`, validated by `validateIntent`; it never supplies a number, date of delivery, order or case id.
+- One task state (`src/retail/state.ts`) is edited by typed language and by components. Cards are messages with a frozen snapshot; `cardLive` derives from keys whether a card may still act. Never make an old quote submittable.
+- A case is created only by the explicit "Confirm and submit" (`confirmed: true`), re-validated server-side, idempotent per key and per identical payload within a session. Failure must say "Request not created" or that creation is unknown; never show a receipt on failure.
+- Pickup address and delivery address are separate fields; "ship it to my company" changes `delivery` only.
+- Port: set `SCENE_PORT` when 5173 is taken (vite and Playwright read it). Never run the dev server in `live` mode from tests: retail `interpret` also spends the paid budget.
+
+## Rules
+- Report numbers come only from `src/query/metrics.ts`. Model output never supplies figures; validate it with `src/query/validate.ts` before use.
+- Expected values live in `tests/expected.json`, hand-computed from `src/data/spec.ts`. Never derive expectations from engine output.
+- Layout (style) and query (data meaning) stay separate. Component identity is the id in `src/layout/components.ts`; in OpenPencil it is the node NAME `scene-<id>` (node ids are reassigned on save).
+- OpenUI silently drops components outside the library without calling `onError`; validate model output yourself first.
+- Never put keys in files, logs, prompts or evidence. Paid calls: `reserve()` first (`src/ai/budget.ts`); failures count; default cap is 0 until a human sets it.
+- Label every report as demo data and as live-model vs prepared-fallback. Never present fallback as live.
+- Evidence is internal working material: it goes in `evidence/<phase>/` (git-ignored, never committed or shared) with raw output, command, result and a verified / observed / unknown split. Do not claim what was not executed.
+- Do not touch `~/Documents/Intelligent_UI_Local_Project` (separate research repo with its own evidence rules; read-only reference).
+- Layout: pinned components are anchored at the top (`src/layout/arrange.ts`); layout JSON must pass `parseLayout` wherever it enters. The design file `.scene-data/design.fig` is runtime state (git-ignored).
+- Browser-reachable code must not import `node:*` (`tests/browser-safe.test.ts`).
